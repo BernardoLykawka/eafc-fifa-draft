@@ -1,0 +1,17 @@
+.row {
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.row:hover {
+  background-color: var(--color-bg-secondary);
+}
+
+.selected {
+  background-color: var(--color-border-primary);
+  cursor: pointer;
+}
+
+.center {
+  text-align: center;
+}

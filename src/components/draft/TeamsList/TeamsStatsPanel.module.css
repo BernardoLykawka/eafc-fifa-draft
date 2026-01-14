@@ -1,0 +1,16 @@
+.container {
+  background-color: var(--color-bg-secondary);
+  padding: var(--spacing-md);
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--spacing-md);
+}
+
+.stat {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--spacing-xs);
+}
+
+.stat:last-child {
+  margin-bottom: 0;
+}

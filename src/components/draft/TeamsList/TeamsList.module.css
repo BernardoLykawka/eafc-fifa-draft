@@ -1,0 +1,15 @@
+.panel {
+  background-color: var(--color-bg-primary);
+  padding: var(--spacing-md);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex: 1;
+}
+
+.title {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-xl);
+  margin-bottom: var(--spacing-md);
+}

@@ -1,0 +1,26 @@
+.center {
+  text-align: center;
+}
+
+.team0 {
+  background-color: var(--color-team-0);
+}
+
+.team1 {
+  background-color: var(--color-team-1);
+}
+
+.team2 {
+  background-color: var(--color-team-2);
+}
+
+.team3 {
+  background-color: var(--color-team-3);
+}
+
+td {
+  padding: var(--spacing-sm);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+  border-bottom: 1px solid var(--color-border-secondary);
+}
