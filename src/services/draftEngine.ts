@@ -28,22 +28,22 @@ export const validateDraftConfig = (
   availablePlayers: number
 ): { valid: boolean; message?: string } => {
   if (numTeams < 2) {
-    return { valid: false, message: 'Must have at least 2 teams' };
+    return { valid: false, message: 'You need at least 2 teams.' };
   }
   
   if (numTeams > 10) {
-    return { valid: false, message: 'Maximum of 10 teams allowed' };
+    return { valid: false, message: 'A maximum of 10 teams is allowed.' };
   }
   
   if (playersPerTeam < 1) {
-    return { valid: false, message: 'Must have at least 1 player per team' };
+    return { valid: false, message: 'Each team needs at least 1 player.' };
   }
   
   const totalNeeded = numTeams * playersPerTeam;
   if (totalNeeded > availablePlayers) {
     return {
       valid: false,
-      message: `Not enough players!\nRequired: ${totalNeeded}\nAvailable: ${availablePlayers}`,
+      message: `Not enough players.\nRequired: ${totalNeeded}\nAvailable: ${availablePlayers}`,
     };
   }
   

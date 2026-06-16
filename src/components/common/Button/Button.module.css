@@ -36,11 +36,12 @@
 }
 
 .action {
-  background-color: var(--color-accent-success);
+  background: linear-gradient(90deg, var(--color-accent-success), #66c0f4);
   color: var(--color-text-primary);
-  padding: 12px var(--spacing-xxl);
+  padding: 14px var(--spacing-xxl);
   font-size: var(--font-size-xl);
   width: 100%;
+  text-transform: uppercase;
 }
 
 .action:hover:not(:disabled) {

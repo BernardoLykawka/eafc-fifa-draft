@@ -33,6 +33,7 @@ export interface TeamLineup {
 }
 
 export interface DraftState {
+  draftName: string;
   version: string;
   numTeams: number;
   playersPerTeam: number;
@@ -42,6 +43,41 @@ export interface DraftState {
   teams: Team[];
   availablePlayers: Player[];
   allPlayers: Player[];
+  tournament?: SavedTournamentState;
+}
+
+export type TournamentFormat =
+  | 'knockout'
+  | 'groupsAndKnockout'
+  | 'league';
+
+export interface TournamentSettings {
+  format: TournamentFormat;
+  groupOrLeagueRoundTrip: boolean;
+  knockoutRoundTrip: boolean;
+  trackScorers: boolean;
+}
+
+export interface TournamentMatch {
+  id: string;
+  stage: string;
+  round?: number;
+  leg?: 1 | 2;
+  homeLabel: string;
+  awayLabel: string;
+  homeTeamIndex: number | null;
+  awayTeamIndex: number | null;
+  isBye: boolean;
+  homeScore: string;
+  awayScore: string;
+  homeScorers: string[];
+  awayScorers: string[];
+}
+
+export interface SavedTournamentState {
+  settings: TournamentSettings;
+  matches: TournamentMatch[];
+  finished: boolean;
 }
 
 export interface ElectronAPI {

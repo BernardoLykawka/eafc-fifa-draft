@@ -1,7 +1,8 @@
 .container {
   flex: 1;
   overflow-y: auto;
-  background-color: var(--color-bg-tertiary);
+  background-color: rgba(34, 49, 63, 0.86);
+  border: 1px solid rgba(102, 192, 244, 0.12);
   border-radius: var(--radius-sm);
   margin-bottom: var(--spacing-md);
 }
@@ -12,7 +13,7 @@
 }
 
 .thead {
-  background-color: var(--color-bg-secondary);
+  background-color: #31536c;
   position: sticky;
   top: 0;
   z-index: var(--z-sticky);
@@ -28,8 +29,19 @@
 }
 
 .table td {
-  padding: var(--spacing-sm);
+  padding: 10px var(--spacing-sm);
   color: var(--color-text-primary);
   font-size: var(--font-size-sm);
-  border-bottom: 1px solid var(--color-border-secondary);
+  border-bottom: 1px solid rgba(102, 192, 244, 0.12);
+}
+
+.loadingMore {
+  position: sticky;
+  bottom: 0;
+  padding: 10px;
+  background: rgba(27, 40, 56, 0.94);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: 800;
+  text-align: center;
 }

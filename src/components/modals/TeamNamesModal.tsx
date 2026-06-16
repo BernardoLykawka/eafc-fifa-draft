@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Modal, Button } from '../common';
 import styles from './TeamNamesModal.module.css';
+import { useI18n } from '../../i18n-context';
 
 interface TeamNamesModalProps {
   numTeams: number;
@@ -15,9 +16,16 @@ const TeamNamesModal: React.FC<TeamNamesModalProps> = ({
   onSubmit,
   onCancel,
 }) => {
+  const { t } = useI18n();
   const [names, setNames] = useState<string[]>(
     Array.from({ length: numTeams }, () => '')
   );
+
+  useEffect(() => {
+    setNames((currentNames) =>
+      Array.from({ length: numTeams }, (_, index) => currentNames[index] || '')
+    );
+  }, [numTeams]);
 
   const handleSubmit = () => {
     onSubmit(names);
@@ -32,14 +40,14 @@ const TeamNamesModal: React.FC<TeamNamesModalProps> = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onCancel} title="Team Names">
+    <Modal isOpen={isOpen} onClose={onCancel} title={t('teamNames')}>
       <p className={styles.description}>
-        Enter the name for each team (leave blank to use default)
+        {t('teamNamesDescription')}
       </p>
-      <div className={styles.inputs}>
+      <div className={styles.inputs} onKeyDown={handleKeyDown}>
         {Array.from({ length: numTeams }).map((_, idx) => (
           <div key={idx} className={styles.inputRow}>
-            <label className={styles.label}>Team {idx + 1}:</label>
+            <label className={styles.label}>{t('team')} {idx + 1}:</label>
             <input
               type="text"
               value={names[idx]}
@@ -48,7 +56,7 @@ const TeamNamesModal: React.FC<TeamNamesModalProps> = ({
                 newNames[idx] = e.target.value;
                 setNames(newNames);
               }}
-              placeholder={`Team ${idx + 1}`}
+              placeholder={`${t('team')} ${idx + 1}`}
               autoFocus={idx === 0}
               className={styles.input}
             />
@@ -57,10 +65,10 @@ const TeamNamesModal: React.FC<TeamNamesModalProps> = ({
       </div>
       <div className={styles.actions}>
         <Button variant="primary" onClick={handleSubmit}>
-          Confirm
+          {t('drawOrder')}
         </Button>
         <Button variant="secondary" onClick={onCancel}>
-          Cancel
+          {t('cancel')}
         </Button>
       </div>
     </Modal>

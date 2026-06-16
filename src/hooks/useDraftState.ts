@@ -16,7 +16,7 @@ interface UseDraftStateResult {
   selectedPlayer: Player | null;
   setSelectedPlayer: (player: Player | null) => void;
   setTeams: (teams: Team[]) => void;
-  initializeDraft: (numTeams: number, teamNames: string[]) => void;
+  initializeDraft: (numTeams: number, teamNames: string[]) => Team[];
   pickPlayer: (
     player: Player,
     availablePlayers: Player[],
@@ -68,6 +68,8 @@ export const useDraftState = (): UseDraftStateResult => {
     setCurrentTeam(0);
     setDraftActive(true);
     setSelectedPlayer(null);
+
+    return shuffledTeams;
   }, []);
 
   const pickPlayer = useCallback(
@@ -138,7 +140,7 @@ export const useDraftState = (): UseDraftStateResult => {
   const getCurrentTeamName = useCallback(
     (numTeams: number) => {
       const idx = getCurrentTeamIndex(numTeams);
-      return teams[idx]?.name || `Time ${idx + 1}`;
+    return teams[idx]?.name || `Team ${idx + 1}`;
     },
     [teams, currentRound, currentTeam]
   );

@@ -1,5 +1,8 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import type { Team, Player } from '../types';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import type { Player, Team } from '../types';
+import { initializeField } from '../services/lineupService';
+import styles from './TeamViewer.module.css';
+import { useI18n } from '../i18n-context';
 
 interface TeamViewerProps {
   teams: Team[];
@@ -7,343 +10,328 @@ interface TeamViewerProps {
   onUpdateTeams: (teams: Team[]) => void;
 }
 
+const STARTERS_COUNT = 11;
+
 const TeamViewer: React.FC<TeamViewerProps> = ({
   teams,
   onClose,
   onUpdateTeams,
 }) => {
+  const { t } = useI18n();
   const [currentTeamIdx, setCurrentTeamIdx] = useState(0);
-  const [selectedBenchPlayer, setSelectedBenchPlayer] = useState<Player | null>(null);
-  const [selectedFieldPlayer, setSelectedFieldPlayer] = useState<number | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [draggingFieldIndex, setDraggingFieldIndex] = useState<number | null>(null);
-  const [dragPosition, setDragPosition] = useState<{ x: number; y: number } | null>(null);
-  const [canvasSize, setCanvasSize] = useState<{ width: number; height: number }>({ width: 500, height: 700 });
+  const [selectedBenchId, setSelectedBenchId] = useState<string | null>(null);
+  const [draggingSlotIndex, setDraggingSlotIndex] = useState<number | null>(null);
+  const pitchRef = useRef<HTMLDivElement>(null);
 
   const currentTeam = teams[currentTeamIdx];
+  const selectedBenchPlayer = useMemo(
+    () =>
+      currentTeam?.lineup.bench.find(
+        (player) => player.player_id === selectedBenchId
+      ) || null,
+    [currentTeam, selectedBenchId]
+  );
 
-  // Resize canvas responsively (keep 5:7 aspect ratio)
   useEffect(() => {
-    const resize = () => {
-      const container = canvasRef.current?.parentElement;
-      if (!container || !canvasRef.current) return;
-      const dpr = window.devicePixelRatio || 1;
-      const maxWidth = Math.min(container.clientWidth, 800);
-      const viewportMaxHeight = Math.max(300, Math.floor(window.innerHeight * 0.65));
-      const widthByHeight = Math.floor(viewportMaxHeight * (5 / 7));
-      const clientWidth = Math.min(maxWidth, widthByHeight);
-      const clientHeight = Math.round(clientWidth * (7 / 5));
-      const canvas = canvasRef.current;
-      canvas.style.width = clientWidth + 'px';
-      canvas.style.height = clientHeight + 'px';
-      canvas.width = Math.round(clientWidth * dpr);
-      canvas.height = Math.round(clientHeight * dpr);
-      setCanvasSize({ width: canvas.width, height: canvas.height });
-    };
-    resize();
-    const obs = new ResizeObserver(resize);
-    if (canvasRef.current?.parentElement) obs.observe(canvasRef.current.parentElement);
-    window.addEventListener('resize', resize);
-    return () => {
-      obs.disconnect();
-      window.removeEventListener('resize', resize);
-    };
-  }, []);
+    if (!currentTeam) return;
 
-  // Draw field + players
-  useEffect(() => {
-    if (!canvasRef.current || !currentTeam) return;
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    const hasInvalidFieldSize = currentTeam.lineup.field.length !== STARTERS_COUNT;
+    const extraFieldPlayers = currentTeam.lineup.field
+      .slice(STARTERS_COUNT)
+      .map((slot) => slot.player)
+      .filter(Boolean) as Player[];
 
-    const width = canvas.width;
-    const height = canvas.height;
-    const dpr = window.devicePixelRatio || 1;
+    if (!hasInvalidFieldSize && extraFieldPlayers.length === 0) return;
 
-    // Scale context for high DPI displays
-    ctx.save();
-    ctx.scale(dpr, dpr);
-    
-    const displayWidth = width / dpr;
-    const displayHeight = height / dpr;
+    const updatedTeams = teams.map((team, index) => {
+      if (index !== currentTeamIdx) return team;
 
-    // Clear
-    ctx.clearRect(0, 0, displayWidth, displayHeight);
-
-    // Draw pitch background
-    ctx.fillStyle = '#0b6623';
-    ctx.fillRect(0, 0, displayWidth, displayHeight);
-
-    // Pitch lines
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 2;
-    // Border
-    ctx.strokeRect(10, 10, displayWidth - 20, displayHeight - 20);
-    // Mid line
-    ctx.beginPath();
-    ctx.moveTo(10, displayHeight / 2);
-    ctx.lineTo(displayWidth - 10, displayHeight / 2);
-    ctx.stroke();
-    // Center circle
-    ctx.beginPath();
-    ctx.arc(displayWidth / 2, displayHeight / 2, 50, 0, Math.PI * 2);
-    ctx.stroke();
-
-    // Draw players
-    currentTeam.lineup.field.forEach((slot, idx) => {
-      if (!slot.player) return; // Não desenhar slots vazios
-      
-      // Use drag position if this is the dragged player
-      let x, y;
-      if (draggingFieldIndex === idx && dragPosition) {
-        x = dragPosition.x * displayWidth;
-        y = dragPosition.y * displayHeight;
-      } else {
-        x = slot.x * displayWidth;
-        y = slot.y * displayHeight;
-      }
-      const radius = 18;
-
-      // Circle
-      ctx.beginPath();
-      ctx.arc(x, y, radius, 0, 2 * Math.PI);
-      ctx.fillStyle = '#4CAF50';
-      ctx.fill();
-      ctx.strokeStyle = selectedFieldPlayer === idx ? '#ffd700' : '#000000';
-      ctx.lineWidth = selectedFieldPlayer === idx ? 3 : 1;
-      ctx.stroke();
-
-      // Label
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 12px Arial';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      const name = slot.player.short_name;
-      const displayName = name.length > 10 ? name.slice(0, 10) + '…' : name;
-      ctx.fillText(displayName, x, y - 2);
-      ctx.font = '11px Arial';
-      ctx.fillText(`${slot.player.overall}`, x, y + 12);
-    });
-    
-    ctx.restore();
-  }, [currentTeam, selectedFieldPlayer, canvasSize, draggingFieldIndex, dragPosition]);
-
-  // Canvas events for drag/drop and placement
-  const getCanvasCoords = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current!;
-    const rect = canvas.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * canvas.width;
-    const y = ((e.clientY - rect.top) / rect.height) * canvas.height;
-    return { x, y };
-  };
-
-  // Memoized handlers to prevent unnecessary re-renders
-  const handleCanvasMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!canvasRef.current || !currentTeam) return;
-    const { x, y } = getCanvasCoords(e);
-    const width = canvasRef.current.width;
-    const height = canvasRef.current.height;
-
-    if (selectedBenchPlayer) {
-      const onFieldCount = currentTeam.lineup.field.filter(s => s.player).length;
-      if (onFieldCount >= 11) {
-        alert('Maximum 11 players on field!');
-        return;
-      }
-      
-      const updatedTeams = [...teams];
-      const team = updatedTeams[currentTeamIdx];
-      team.lineup.field.push({ 
-        x: x / width, 
-        y: y / height, 
-        player: selectedBenchPlayer 
+      const baseField = initializeField();
+      currentTeam.lineup.field.slice(0, STARTERS_COUNT).forEach((slot, slotIndex) => {
+        baseField[slotIndex].player = slot.player;
       });
-      team.lineup.bench = team.lineup.bench.filter(p => p.player_id !== selectedBenchPlayer.player_id);
-      onUpdateTeams(updatedTeams);
-      setSelectedBenchPlayer(null);
-      return;
-    }
 
-    // Check if clicking an existing field player
-    const hitIndex = currentTeam.lineup.field.findIndex(slot => {
-      if (!slot.player) return false;
-      const cx = slot.x * width;
-      const cy = slot.y * height;
-      const dist = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2);
-      return dist <= 25;
-    });
-    
-    if (hitIndex >= 0) {
-      setDraggingFieldIndex(hitIndex);
-      setSelectedFieldPlayer(hitIndex);
-    } else {
-      setSelectedFieldPlayer(null);
-    }
-  }, [teams, currentTeamIdx, currentTeam, selectedBenchPlayer, onUpdateTeams]);
+      const benchIds = new Set(currentTeam.lineup.bench.map((player) => player.player_id));
+      const recoveredPlayers = extraFieldPlayers.filter(
+        (player) => !benchIds.has(player.player_id)
+      );
 
-  const handleCanvasMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (draggingFieldIndex === null || !canvasRef.current) return;
-    
-    const { x, y } = getCanvasCoords(e);
-    const width = canvasRef.current.width;
-    const height = canvasRef.current.height;
-    
-    const nx = Math.max(0.05, Math.min(0.95, x / width));
-    const ny = Math.max(0.05, Math.min(0.95, y / height));
-    
-    setDragPosition({ x: nx, y: ny });
-  }, [draggingFieldIndex]);
-
-  const handleCanvasMouseUp = useCallback(() => {
-    if (draggingFieldIndex !== null && dragPosition) {
-      const updatedTeams = [...teams];
-      const team = updatedTeams[currentTeamIdx];
-      const slot = team.lineup.field[draggingFieldIndex];
-      slot.x = dragPosition.x;
-      slot.y = dragPosition.y;
-      onUpdateTeams(updatedTeams);
-    }
-    
-    setDraggingFieldIndex(null);
-    setDragPosition(null);
-  }, [draggingFieldIndex, dragPosition, teams, currentTeamIdx, onUpdateTeams]);
-
-  const handleCanvasDoubleClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!canvasRef.current || !currentTeam) return;
-    const { x, y } = getCanvasCoords(e);
-    const width = canvasRef.current.width;
-    const height = canvasRef.current.height;
-
-    const hitIndex = currentTeam.lineup.field.findIndex(slot => {
-      if (!slot.player) return false;
-      const cx = slot.x * width;
-      const cy = slot.y * height;
-      const dist = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2);
-      return dist <= 25;
+      return {
+        ...team,
+        lineup: {
+          field: baseField,
+          bench: [...team.lineup.bench, ...recoveredPlayers],
+        },
+      };
     });
 
-    if (hitIndex >= 0) {
-      const updatedTeams = [...teams];
-      const team = updatedTeams[currentTeamIdx];
-      const slot = team.lineup.field[hitIndex];
-      
-      if (slot.player) {
-        team.lineup.bench.push(slot.player);
-        team.lineup.field.splice(hitIndex, 1);
-        onUpdateTeams(updatedTeams);
-        setSelectedFieldPlayer(null);
-      }
-    }
-  }, [currentTeam, teams, currentTeamIdx, onUpdateTeams]);
+    onUpdateTeams(updatedTeams);
+  }, [currentTeam, currentTeamIdx, onUpdateTeams, teams]);
 
-  // Handle bench player click
-  const handleBenchPlayerClick = useCallback((player: Player) => {
-    setSelectedBenchPlayer(
-      selectedBenchPlayer?.player_id === player.player_id ? null : player
-    );
-    setSelectedFieldPlayer(null);
-  }, [selectedBenchPlayer]);
+  useEffect(() => {
+    setSelectedBenchId(null);
+  }, [currentTeamIdx]);
 
   if (!currentTeam) return null;
 
+  const starters = currentTeam.lineup.field.filter((slot) => slot.player).length;
+  const bench = currentTeam.lineup.bench;
+
+  const updateCurrentTeam = (updater: (team: Team) => Team) => {
+    onUpdateTeams(
+      teams.map((team, index) => (index === currentTeamIdx ? updater(team) : team))
+    );
+  };
+
+  const getPitchPoint = (event: React.PointerEvent<HTMLElement>) => {
+    const pitch = pitchRef.current;
+    if (!pitch) return null;
+
+    const rect = pitch.getBoundingClientRect();
+    return {
+      x: Math.max(0.04, Math.min(0.96, (event.clientX - rect.left) / rect.width)),
+      y: Math.max(0.05, Math.min(0.95, (event.clientY - rect.top) / rect.height)),
+    };
+  };
+
+  const handleBenchClick = (player: Player) => {
+    setSelectedBenchId((currentId) =>
+      currentId === player.player_id ? null : player.player_id
+    );
+  };
+
+  const handlePitchClick = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!selectedBenchPlayer || event.target !== event.currentTarget) return;
+
+    const point = getPitchPoint(event);
+    if (!point) return;
+
+    if (starters >= STARTERS_COUNT) {
+      alert(t('maxStartersAlert'));
+      return;
+    }
+
+    updateCurrentTeam((team) => {
+      const field = team.lineup.field.map((fieldSlot) => ({ ...fieldSlot }));
+      const emptySlotIndex = field.findIndex((slot) => !slot.player);
+      const nextSlot = {
+        x: point.x,
+        y: point.y,
+        player: selectedBenchPlayer,
+      };
+
+      field[emptySlotIndex] = nextSlot;
+
+      return {
+        ...team,
+        lineup: {
+          field,
+          bench: team.lineup.bench.filter(
+            (player) => player.player_id !== selectedBenchPlayer.player_id
+          ),
+        },
+      };
+    });
+
+    setSelectedBenchId(null);
+  };
+
+  const handlePlayerPointerDown = (
+    event: React.PointerEvent<HTMLButtonElement>,
+    slotIndex: number
+  ) => {
+    event.stopPropagation();
+    setDraggingSlotIndex(slotIndex);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handlePlayerPointerMove = (
+    event: React.PointerEvent<HTMLButtonElement>,
+    slotIndex: number
+  ) => {
+    if (draggingSlotIndex !== slotIndex) return;
+
+    const point = getPitchPoint(event);
+    if (!point) return;
+
+    updateCurrentTeam((team) => ({
+      ...team,
+      lineup: {
+        ...team.lineup,
+        field: team.lineup.field.map((slot, index) =>
+          index === slotIndex ? { ...slot, x: point.x, y: point.y } : slot
+        ),
+      },
+    }));
+  };
+
+  const handlePlayerPointerUp = (event: React.PointerEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    setDraggingSlotIndex(null);
+  };
+
+  const handleFieldPlayerDoubleClick = (
+    event: React.MouseEvent<HTMLButtonElement>,
+    slotIndex: number
+  ) => {
+    event.stopPropagation();
+
+    updateCurrentTeam((team) => {
+      const player = team.lineup.field[slotIndex]?.player;
+      if (!player) return team;
+
+      return {
+        ...team,
+        lineup: {
+          field: team.lineup.field.map((slot, index) =>
+            index === slotIndex ? { ...slot, player: null } : slot
+          ),
+          bench: [...team.lineup.bench, player],
+        },
+      };
+    });
+  };
+
+  const handleClearField = () => {
+    updateCurrentTeam((team) => {
+      const startersToBench = team.lineup.field
+        .map((slot) => slot.player)
+        .filter(Boolean) as Player[];
+
+      return {
+        ...team,
+        lineup: {
+          field: team.lineup.field.map((slot) => ({ ...slot, player: null })),
+          bench: [...team.lineup.bench, ...startersToBench],
+        },
+      };
+    });
+    setSelectedBenchId(null);
+  };
+
   return (
-    <div className="modal">
-      <div className="modal-content large">
-        <div className="modal-header">
-          <h2>Team Lineups</h2>
-          <button className="close-btn" onClick={onClose}>
-            &times;
+    <section className={styles.page}>
+      <header className={styles.header}>
+        <div className={styles.headerIntro}>
+          <span className={styles.kicker}>{t('squadCenter')}</span>
+          <p>{t('lineupHelp')}</p>
+        </div>
+
+        <label className={styles.teamSelect}>
+          <span>{t('team')}</span>
+          <select
+            value={currentTeamIdx}
+            onChange={(event) => setCurrentTeamIdx(Number(event.target.value))}
+          >
+            {teams.map((team, index) => (
+              <option key={`${team.name}-${index}`} value={index}>
+                {team.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <div className={styles.headerStats}>
+          <div className={styles.summary}>
+            <strong>{starters}/{STARTERS_COUNT}</strong>
+          <span>{t('starters')}</span>
+          </div>
+
+          <div className={styles.summary}>
+            <strong>{bench.length}</strong>
+          <span>{t('bench')}</span>
+          </div>
+        </div>
+
+        <div className={styles.headerActions}>
+          <button className={styles.secondaryButton} type="button" onClick={handleClearField}>
+            {t('clearPitch')}
+          </button>
+          <button className={styles.backButton} type="button" onClick={onClose}>
+            {t('backToDraft')}
           </button>
         </div>
+      </header>
 
-        <div className="modal-body">
-          <div className="team-selector">
-            <label>Selecione o time:</label>
-            <select
-              value={currentTeamIdx}
-              onChange={(e) => {
-                setCurrentTeamIdx(Number(e.target.value));
-                setSelectedBenchPlayer(null);
-                setSelectedFieldPlayer(null);
-              }}
-            >
-              {teams.map((team, idx) => (
-                <option key={idx} value={idx}>
-                  {team.name}
-                </option>
-              ))}
-            </select>
-            <button
-              className="btn-secondary"
-              style={{ marginLeft: 'auto' }}
-              onClick={() => {
-                if (!currentTeam) return;
-                const updatedTeams = [...teams];
-                const team = updatedTeams[currentTeamIdx];
-                team.lineup.field.forEach(slot => {
-                  if (slot.player) {
-                    team.lineup.bench.push(slot.player);
-                  }
-                });
-                team.lineup.field = [];
-                onUpdateTeams(updatedTeams);
-              }}
-            >
-              Clear Field
-            </button>
+      <div className={styles.content}>
+        <aside className={styles.benchPanel}>
+          <div className={styles.panelTitle}>
+            <span>{t('bench')}</span>
+            <strong>{bench.length}</strong>
           </div>
 
-          <div className="lineup-container">
-            <div className="field-container">
-              <h4>Field (click to place/remove player)</h4>
-              <canvas
-                ref={canvasRef}
-                width={500}
-                height={700}
-                onMouseDown={handleCanvasMouseDown}
-                onMouseMove={handleCanvasMouseMove}
-                onMouseUp={handleCanvasMouseUp}
-                onDoubleClick={handleCanvasDoubleClick}
-                style={{ cursor: draggingFieldIndex !== null ? 'grabbing' : 'pointer' }}
-              />
-            </div>
-
-            <div className="bench-container">
-              <h4>Bench</h4>
-              <div className="table-container">
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Name</th>
-                      <th>Pos</th>
-                      <th>OVR</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {currentTeam.lineup.bench.map((player) => (
-                      <tr
-                        key={player.player_id}
-                        className={
-                          selectedBenchPlayer?.player_id === player.player_id
-                            ? 'selected'
-                            : ''
-                        }
-                        onClick={() => handleBenchPlayerClick(player)}
-                      >
-                        <td>{player.short_name}</td>
-                        <td className="center">{player.player_positions}</td>
-                        <td className="center">{player.overall}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+          <div className={styles.benchList}>
+            {bench.length === 0 ? (
+              <p className={styles.emptyState}>{t('allPlayersOnPitch')}</p>
+            ) : (
+              bench.map((player) => (
+                <button
+                  key={player.player_id}
+                  type="button"
+                  className={`${styles.benchPlayer} ${
+                    selectedBenchId === player.player_id ? styles.selectedBench : ''
+                  }`}
+                  onClick={() => handleBenchClick(player)}
+                >
+                  <span>
+                    <strong>{player.short_name}</strong>
+                    <small>{player.player_positions} - {player.club_name}</small>
+                  </span>
+                  <b>{player.overall}</b>
+                </button>
+              ))
+            )}
           </div>
-        </div>
+        </aside>
+
+        <main className={styles.pitchPanel}>
+          <div className={styles.pitchHeader}>
+            <span>{t('startingPitch')}</span>
+            {selectedBenchPlayer ? (
+              <strong>{t('clickPitchToPlace')} {selectedBenchPlayer.short_name}</strong>
+            ) : (
+              <strong>{t('dragMoveDoubleClick')}</strong>
+            )}
+          </div>
+
+          <div
+            ref={pitchRef}
+            className={`${styles.pitch} ${
+              selectedBenchPlayer ? styles.pitchPlacing : ''
+            }`}
+            onPointerDown={handlePitchClick}
+          >
+            <div className={styles.pitchLineCenter} />
+            <div className={styles.pitchCircle} />
+            <div className={styles.boxTop} />
+            <div className={styles.boxBottom} />
+
+            {currentTeam.lineup.field.slice(0, STARTERS_COUNT).map((slot, index) => (
+              slot.player ? (
+                <button
+                  key={index}
+                  type="button"
+                  className={`${styles.fieldSlot} ${styles.filledSlot} ${
+                    draggingSlotIndex === index ? styles.draggingSlot : ''
+                  }`}
+                  style={{
+                    left: `${slot.x * 100}%`,
+                    top: `${slot.y * 100}%`,
+                  }}
+                  onPointerDown={(event) => handlePlayerPointerDown(event, index)}
+                  onPointerMove={(event) => handlePlayerPointerMove(event, index)}
+                  onPointerUp={handlePlayerPointerUp}
+                  onDoubleClick={(event) => handleFieldPlayerDoubleClick(event, index)}
+                >
+                  <strong>{slot.player.short_name}</strong>
+                  <span>{slot.player.overall}</span>
+                </button>
+              ) : null
+            ))}
+          </div>
+        </main>
       </div>
-    </div>
+    </section>
   );
 };
 

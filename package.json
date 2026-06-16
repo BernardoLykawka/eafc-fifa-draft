@@ -7,6 +7,9 @@
   "private": true,
   "scripts": {
     "start": "electron-forge start",
+    "dev:web": "vite --config vite.renderer.config.ts",
+    "build:web": "vite build --config vite.renderer.config.ts",
+    "preview:web": "vite preview --config vite.renderer.config.ts",
     "package": "electron-forge package",
     "make": "electron-forge make",
     "publish": "electron-forge publish",
