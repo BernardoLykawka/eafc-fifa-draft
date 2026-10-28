@@ -16,12 +16,17 @@ interface UseDraftStateResult {
   selectedPlayer: Player | null;
   setSelectedPlayer: (player: Player | null) => void;
   setTeams: (teams: Team[]) => void;
-  initializeDraft: (numTeams: number, teamNames: string[]) => Team[];
+  initializeDraft: (
+    numTeams: number,
+    teamNames: string[],
+    formations?: string[]
+  ) => Team[];
   pickPlayer: (
     player: Player,
     availablePlayers: Player[],
     playersPerTeam: number,
-    numTeams: number
+    numTeams: number,
+    slotIndex?: number
   ) => {
     updatedTeams: Team[];
     updatedAvailable: Player[];
@@ -47,13 +52,14 @@ export const useDraftState = (): UseDraftStateResult => {
   const [teams, setTeams] = useState<Team[]>([]);
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
 
-  const initializeDraft = useCallback((numTeams: number, teamNames: string[]) => {
+  const initializeDraft = useCallback((numTeams: number, teamNames: string[], formations?: string[]) => {
     const newTeams: Team[] = teamNames.map((name, idx) => ({
       name: name || `Team ${idx + 1}`,
+      ...(formations ? { formation: formations[idx] } : {}),
       players: [] as Player[],
       lineup: {
         bench: [] as Player[],
-        field: initializeField(),
+        field: initializeField(formations?.[idx]),
       },
     }));
 
@@ -77,13 +83,18 @@ export const useDraftState = (): UseDraftStateResult => {
       player: Player,
       availablePlayers: Player[],
       playersPerTeam: number,
-      numTeams: number
+      numTeams: number,
+      slotIndex?: number
     ) => {
       const teamIdx = getSnakeDraftTeamIndex(currentRound, currentTeam, numTeams);
 
       const updatedTeams = [...teams];
       updatedTeams[teamIdx].players.push(player);
-      updatedTeams[teamIdx].lineup.bench.push(player);
+      if (slotIndex !== undefined && updatedTeams[teamIdx].lineup.field[slotIndex]) {
+        updatedTeams[teamIdx].lineup.field[slotIndex].player = player;
+      } else {
+        updatedTeams[teamIdx].lineup.bench.push(player);
+      }
 
       const updatedAvailable = availablePlayers.filter(
         (p) => p.player_id !== player.player_id

@@ -17,6 +17,7 @@ export interface Player {
 
 export interface Team {
   name: string;
+  formation?: string;
   players: Player[];
   lineup: TeamLineup;
 }
@@ -32,6 +33,8 @@ export interface TeamLineup {
   field: FieldSlot[];
 }
 
+export type DraftMode = 'classic' | 'formation';
+
 export interface DraftState {
   draftName: string;
   version: string;
@@ -44,6 +47,11 @@ export interface DraftState {
   availablePlayers: Player[];
   allPlayers: Player[];
   tournament?: SavedTournamentState;
+  mode?: DraftMode;
+  benchSize?: number;
+  pickOptions?: Record<number, Player[]>;
+  pickSlot?: number | null;
+  pickBenchPosition?: string | null;
 }
 
 export type TournamentFormat =

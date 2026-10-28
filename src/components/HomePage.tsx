@@ -1,5 +1,6 @@
 import React from 'react';
 import { FIFA_VERSIONS } from '../constants/versions';
+import type { DraftMode } from '../types';
 import { localeNames, type Locale } from '../i18n';
 import { useI18n } from '../i18n-context';
 
@@ -19,6 +20,10 @@ interface HomePageProps {
   numTeams: number;
   playersPerTeam: number;
   playersCount: number;
+  mode: DraftMode;
+  benchSize: number;
+  onModeChange: (mode: DraftMode) => void;
+  onBenchSizeChange: (benchSize: number) => void;
   onDraftNameChange: (draftName: string) => void;
   onVersionChange: (version: string) => void;
   onNumTeamsChange: (numTeams: number) => void;
@@ -34,6 +39,10 @@ const HomePage: React.FC<HomePageProps> = ({
   numTeams,
   playersPerTeam,
   playersCount,
+  mode,
+  benchSize,
+  onModeChange,
+  onBenchSizeChange,
   onDraftNameChange,
   onVersionChange,
   onNumTeamsChange,
@@ -126,6 +135,36 @@ const HomePage: React.FC<HomePageProps> = ({
             </select>
           </label>
 
+          <label>
+            <span>{t('draftMode')}</span>
+            <select
+              value={mode}
+              onChange={(event) => onModeChange(event.target.value as DraftMode)}
+            >
+              <option value="classic">{t('modeClassic')}</option>
+              <option value="formation">{t('modeFormation')}</option>
+            </select>
+          </label>
+
+          {mode === 'formation' && (
+            <>
+              <label>
+                <span>{t('reserves')}</span>
+                <select
+                  value={benchSize}
+                  onChange={(event) => onBenchSizeChange(Number(event.target.value))}
+                >
+                  {[0, 3, 5].map((size) => (
+                    <option key={size} value={size}>
+                      {size}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <p className="hero-tip">{t('formationModeHint')}</p>
+            </>
+          )}
+
           <div className="setup-grid">
             <label>
               <span>{t('teams')}</span>
@@ -145,6 +184,7 @@ const HomePage: React.FC<HomePageProps> = ({
                 min={3}
                 max={26}
                 value={playersPerTeam}
+                disabled={mode === 'formation'}
                 onChange={(event) =>
                   onPlayersPerTeamChange(Number(event.target.value))
                 }

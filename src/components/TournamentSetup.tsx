@@ -51,6 +51,7 @@ interface TournamentSetupProps {
   onStateChange: (state: SavedTournamentState | null) => void;
   onBackToDraft: () => void;
   onOpenLineups: () => void;
+  squadsDisabled?: boolean;
   onSaveFile: () => void;
 }
 
@@ -385,6 +386,7 @@ const TournamentSetup: React.FC<TournamentSetupProps> = ({
   onStateChange,
   onBackToDraft,
   onOpenLineups,
+  squadsDisabled = false,
   onSaveFile,
 }) => {
   const { t } = useI18n();
@@ -642,7 +644,7 @@ const TournamentSetup: React.FC<TournamentSetupProps> = ({
         </div>
 
         <div className={styles.headerActions}>
-          <button type="button" onClick={onOpenLineups}>
+          <button type="button" onClick={onOpenLineups} disabled={squadsDisabled}>
             {t('viewSquads')}
           </button>
           {started ? (
